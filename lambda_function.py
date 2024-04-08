@@ -1,30 +1,32 @@
-import http.client
+import json
 import boto3
-
+import os
+ 
 def lambda_handler(event, context):
-    github_file_url = '/shrav-6/sales_viz_repo/raw/master/lambda_function.zip'
-    s3_bucket_name = "getuploadfromlambdamaybe"
-    s3_key = "lambda_function.zip"
-
-    # Extract host and path from the URL
-    host = 'github.com'
-    path = github_file_url
-
-    # Establish connection to GitHub server using http.client
-    conn = http.client.HTTPSConnection(host)
-    conn.request("GET", path)
-    response = conn.getresponse()
-
-    if response.status == 200:
-        file_content = response.read()  # Read response content
+    message = event["message"]
+    topic_arn = None
+    substring = event["substring"]
+    sns_client = boto3.client('sns')
+    response = sns_client.list_topics()
+    for topic in response['Topics']:
+        print(topic['TopicArn'])
+        if substring in topic['TopicArn']:
+            topic_arn = topic['TopicArn']
+    if(topic_arn == None):
+        print('Topic not found')
+        return {
+            'statusCode': 200,
+            'body': json.dumps('Topic not found!')
+        }
     else:
-        print(f"Failed to download file: {response.status}")
-        return
-
-    # Upload file content to S3 bucket using boto3
-    s3 = boto3.client('s3')
-    try:
-        s3.put_object(Bucket=s3_bucket_name, Key=s3_key, Body=file_content)
-        print("File uploaded successfully to S3!")
-    except Exception as e:
-        print(f"Error uploading file to S3: {e}")
+        print('Topic found',topic_arn)
+        response = sns_client.publish(
+        TopicArn=topic_arn,
+        Message=message,
+        Subject='Sales Performance'
+        )
+        # TODO implement
+        return {
+            'statusCode': 200,
+            'body': json.dumps('Email sent successfully!')
+        }
